@@ -1,56 +1,93 @@
 import prisma from "@/lib/prisma";
+import { getCourseById } from "@/lib/courses";
+import { mintCertificateNft } from "@/lib/nft";
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
   try {
-    const { walletAddress, courseId } = await req.json();
+    const body = await req.json();
+    const walletAddress = typeof body.walletAddress === "string" ? body.walletAddress.trim() : "";
+    const courseId = typeof body.courseId === "string" ? body.courseId.trim() : "";
 
-    if (!walletAddress) {
+    if (!walletAddress || !courseId) {
       return NextResponse.json(
-        { error: "Wallet address dibutuhkan" },
+        { error: "walletAddress dan courseId dibutuhkan" },
         { status: 400 },
       );
     }
 
-    // 1. Cari user di database
-    const user = await prisma.user.findUnique({
-      where: { walletAddress },
-    });
+    const course = getCourseById(courseId);
 
-    if (!user) {
-      return NextResponse.json(
-        { error: "User tidak ditemukan" },
-        { status: 404 },
-      );
+    if (!course) {
+      return NextResponse.json({ error: "Course tidak ditemukan" }, { status: 404 });
     }
 
-    // --- TEMPAT KODE METAPLEX (WEB3) ---
-    // Di aplikasi aslinya, di sini kamu menaruh script @metaplex-foundation/js
-    // untuk melakukan minting gambar public/images/certificate.png ke wallet user.
-    // Karena ini butuh Private Key server, kita akan buat simulasi minting (jeda 3 detik) untuk MVP.
+    const origin = new URL(req.url).origin;
 
-    await new Promise((resolve) => setTimeout(resolve, 3000)); // Simulasi proses blockchain
+    await prisma.user.upsert({
+      where: { walletAddress },
+      update: {},
+      create: { walletAddress },
+    });
 
-    const dummyNftAddress = "NFT_" + Math.random().toString(36).substring(7); // Alamat NFT bohongan untuk demo
+    await prisma.course.upsert({
+      where: { id: course.id },
+      update: {
+        title: course.title,
+        description: course.description,
+        content: course.content,
+        duration: course.duration,
+      },
+      create: {
+        id: course.id,
+        title: course.title,
+        description: course.description,
+        content: course.content,
+        duration: course.duration,
+      },
+    });
 
-    // 2. Simpan sertifikat ke database
+    const existingCertificate = await prisma.certificate.findUnique({
+      where: {
+        userWalletAddress_courseId: {
+          userWalletAddress: walletAddress,
+          courseId: course.id,
+        },
+      },
+    });
+
+    if (existingCertificate) {
+      return NextResponse.json({
+        success: true,
+        minted: false,
+        certificate: existingCertificate,
+      });
+    }
+
+    const mintResult = await mintCertificateNft({
+      walletAddress,
+      courseId: course.id,
+      origin,
+    });
+
     const certificate = await prisma.certificate.create({
       data: {
-        userId: user.id,
-        nftAddress: dummyNftAddress,
+        userWalletAddress: walletAddress,
+        courseId: course.id,
+        nftAddress: mintResult.nftAddress,
+        transactionSignature: mintResult.transactionSignature,
+        metadataUri: mintResult.metadataUri,
       },
     });
 
     return NextResponse.json({
       success: true,
-      message: "NFT Berhasil di-Mint!",
+      minted: true,
+      mode: mintResult.mode,
       certificate,
     });
   } catch (error) {
     console.error("Minting error:", error);
-    return NextResponse.json(
-      { error: "Gagal melakukan claim NFT" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Gagal melakukan claim NFT" }, { status: 500 });
   }
 }

@@ -22,32 +22,45 @@ datasource db {
 }
 
 model User {
-  id            String        @id @default(uuid())
-  walletAddress String        @unique
+  walletAddress String        @id
   progress      Progress[]
   certificates  Certificate[]
 }
 
 model Course {
-  id          String     @id @default(uuid())
+  id          String     @id
   title       String
   description String
   content     String     @db.Text
+  duration    String?
   progress    Progress[]
+  certificates Certificate[]
 }
 
 model Progress {
-  id        String  @id @default(uuid())
-  userId    String
-  courseId  String
-  status    Int     @default(0)
-  user      User    @relation(fields: [userId], references: [id])
-  course    Course  @relation(fields: [courseId], references: [id])
+  id                String   @id @default(cuid())
+  userWalletAddress String
+  courseId          String
+  percentage        Int      @default(0)
+  completedAt       DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userWalletAddress], references: [walletAddress], onDelete: Cascade)
+  course            Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userWalletAddress, courseId])
 }
 
 model Certificate {
-  id         String @id @default(uuid())
-  userId     String
-  nftAddress String
-  user       User   @relation(fields: [userId], references: [id])
+  id                   String   @id @default(cuid())
+  userWalletAddress    String
+  courseId             String
+  nftAddress           String
+  transactionSignature String?
+  metadataUri          String?
+  mintedAt             DateTime @default(now())
+  user                 User     @relation(fields: [userWalletAddress], references: [walletAddress], onDelete: Cascade)
+  course               Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userWalletAddress, courseId])
 }
