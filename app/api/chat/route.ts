@@ -59,10 +59,36 @@ async function askGemini(systemPrompt: string) {
   }
 
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL ?? "gemini-1.5-flash" });
-  const result = await model.generateContent(systemPrompt);
+  const modelCandidates = [
+    process.env.GEMINI_MODEL,
+    "gemini-1.5-pro-latest",
+    "gemini-1.5-flash-latest",
+    "gemini-2.0-flash",
+  ].filter((modelName): modelName is string => Boolean(modelName));
 
-  return result.response.text().trim();
+  let lastError: unknown;
+
+  for (const modelName of modelCandidates) {
+    try {
+      const model = genAI.getGenerativeModel(
+        { model: modelName },
+        { apiVersion: modelName.startsWith("gemini-1.5") ? "v1beta" : "v1" },
+      );
+      const result = await model.generateContent(systemPrompt);
+
+      return result.response.text().trim();
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : String(error);
+      if (!/404|429/.test(message)) {
+        throw error;
+      }
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Semua model Gemini gagal merespons.");
 }
 
 export async function POST(req: Request) {
@@ -83,7 +109,22 @@ export async function POST(req: Request) {
     let reply = "";
 
     if (process.env.GEMINI_API_KEY) {
-      reply = await askGemini(tutorPrompt);
+      try {
+        reply = await askGemini(tutorPrompt);
+      } catch (error) {
+        console.error("Gemini fallback error:", error);
+        if (process.env.OPENAI_API_KEY) {
+          reply = await askOpenAI(tutorPrompt);
+        } else {
+          return NextResponse.json(
+            {
+              reply:
+                "Tutor AI sedang sibuk atau quota Gemini belum tersedia. Coba lagi sebentar, atau isi OPENAI_API_KEY untuk fallback model lain.",
+            },
+            { status: 200 },
+          );
+        }
+      }
     } else if (process.env.OPENAI_API_KEY) {
       reply = await askOpenAI(tutorPrompt);
     } else {
