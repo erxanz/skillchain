@@ -23,8 +23,8 @@ export async function GET(req: Request) {
     });
 
     const courseProgress = courseCatalog.map((course) => {
-      const progress = progressRecords.find((record) => record.courseId === course.id);
-      const certificate = certificateRecords.find((record) => record.courseId === course.id);
+      const progress = progressRecords.find((record: (typeof progressRecords)[number]) => record.courseId === course.id);
+      const certificate = certificateRecords.find((record: (typeof certificateRecords)[number]) => record.courseId === course.id);
 
       return {
         ...course,

@@ -55,6 +55,46 @@ async function askOpenAI(systemPrompt: string) {
   return data.choices?.[0]?.message?.content?.trim() ?? "";
 }
 
+async function askGrok(systemPrompt: string) {
+  const apiKey = process.env.GROK_API_KEY;
+  const endpoint = process.env.GROK_ENDPOINT ?? "https://api.together.xyz/v1/chat/completions";
+  const model = process.env.GROK_MODEL ?? "meta-llama/Llama-3-70b-chat-hf";
+
+  if (!apiKey) {
+    throw new Error("Missing GROK_API_KEY");
+  }
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        {
+          role: "system",
+          content:
+            "Kamu adalah Tutor AI di platform edukasi Web3 bernama SkillChain. Jawab singkat, jelas, ramah, dan fokus pada pembelajaran.",
+        },
+        { role: "user", content: systemPrompt },
+      ],
+      temperature: 0.4,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Grok request failed: ${response.status}`);
+  }
+
+  const data = (await response.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+
+  return data.choices?.[0]?.message?.content?.trim() ?? "";
+}
+
 async function askGemini(systemPrompt: string) {
   const apiKey = process.env.GEMINI_API_KEY;
 
@@ -110,25 +150,55 @@ export async function POST(req: Request) {
     });
 
     let reply = "";
+    let lastError: unknown;
 
+    // Coba Gemini dulu
     if (process.env.GEMINI_API_KEY) {
       try {
         reply = await askGemini(tutorPrompt);
+        return NextResponse.json({ reply });
       } catch (error) {
         console.error("Gemini error:", error);
-        const message = error instanceof Error ? error.message : String(error);
-        const fallbackReply = message.includes("429")
-          ? "Quota Gemini sudah habis hari ini. Silakan coba lagi besok atau upgrade plan Gemini API."
-          : "Tutor AI sedang tidak tersedia saat ini. Mohon coba lagi.";
-        return NextResponse.json({ reply: fallbackReply }, { status: 200 });
+        lastError = error;
       }
-    } else if (process.env.OPENAI_API_KEY) {
-      reply = await askOpenAI(tutorPrompt);
-    } else {
+    }
+
+    // Fallback ke Grok
+    if (process.env.GROK_API_KEY && !reply) {
+      try {
+        reply = await askGrok(tutorPrompt);
+        return NextResponse.json({ reply });
+      } catch (error) {
+        console.error("Grok error:", error);
+        lastError = error;
+      }
+    }
+
+    // Fallback ke OpenAI
+    if (process.env.OPENAI_API_KEY && !reply) {
+      try {
+        reply = await askOpenAI(tutorPrompt);
+        return NextResponse.json({ reply });
+      } catch (error) {
+        console.error("OpenAI error:", error);
+        lastError = error;
+      }
+    }
+
+    // Kalau semua gagal, kasih pesan yang informatif
+    if (!reply) {
+      const message = lastError instanceof Error ? lastError.message : String(lastError);
+      const fallbackReply = message.includes("429")
+        ? "Quota AI sudah habis saat ini. Silakan coba lagi dalam beberapa saat."
+        : "Tutor AI sedang tidak tersedia saat ini. Mohon coba lagi.";
+      return NextResponse.json({ reply: fallbackReply }, { status: 200 });
+    }
+
+    if (!process.env.GEMINI_API_KEY && !process.env.GROK_API_KEY && !process.env.OPENAI_API_KEY) {
       return NextResponse.json(
         {
           error:
-            "Tambahkan GEMINI_API_KEY atau OPENAI_API_KEY di environment untuk mengaktifkan Tutor AI.",
+            "Tambahkan GEMINI_API_KEY, GROK_API_KEY, atau OPENAI_API_KEY di environment untuk mengaktifkan Tutor AI.",
         },
         { status: 503 },
       );
