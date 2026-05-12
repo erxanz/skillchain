@@ -68,10 +68,12 @@ export default function DashboardPage() {
         }
 
         const data = (await response.json()) as { courses?: CourseProgressView[] };
-        if (data.courses?.length) {
-          setCourses(data.courses);
+        const remoteCourses = data.courses;
+
+        if (remoteCourses?.length) {
+          setCourses(remoteCourses);
           setSelectedCourseId((current) =>
-            data.courses?.some((course) => course.id === current) ? current : data.courses[0].id,
+            remoteCourses.some((course) => course.id === current) ? current : remoteCourses[0].id,
           );
         }
       } catch {
