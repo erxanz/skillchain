@@ -64,20 +64,16 @@ async function askGemini(systemPrompt: string) {
 
   const genAI = new GoogleGenerativeAI(apiKey);
 
-  // PERBAIKAN: "gemini-1.5-flash" ditaruh paling atas karena kuota gratisnya paling besar (15 request/menit).
-  // Akhiran '-latest' dihapus agar lebih stabil dan terhindar dari bug versi API.
   const modelCandidates = [
     process.env.GEMINI_MODEL,
     "gemini-1.5-flash",
-    "gemini-1.5-pro",
+    "gemini-2.0-flash",
   ].filter((modelName): modelName is string => Boolean(modelName));
 
   let lastError: unknown;
 
   for (const modelName of modelCandidates) {
     try {
-      // PERBAIKAN UTAMA: Hapus pengaturan { apiVersion: ... } agar SDK mendeteksi otomatis
-      // Ini mencegah error 404 Not Found.
       const model = genAI.getGenerativeModel({ model: modelName });
 
       const result = await model.generateContent(systemPrompt);
@@ -119,19 +115,12 @@ export async function POST(req: Request) {
       try {
         reply = await askGemini(tutorPrompt);
       } catch (error) {
-        console.error("Gemini fallback error:", error);
-        if (process.env.OPENAI_API_KEY) {
-          reply = await askOpenAI(tutorPrompt);
-        } else {
-          // PERBAIKAN: Pesan error dibuat lebih halus untuk dibaca user di frontend
-          return NextResponse.json(
-            {
-              reply:
-                "Sistem AI sedang menerima terlalu banyak permintaan (Limit). Mohon tunggu sekitar 1 menit lalu coba lagi ya.",
-            },
-            { status: 200 }, // Tetap 200 agar UI tidak merah, hanya menampilkan pesan ke user
-          );
-        }
+        console.error("Gemini error:", error);
+        const message = error instanceof Error ? error.message : String(error);
+        const fallbackReply = message.includes("429")
+          ? "Quota Gemini sudah habis hari ini. Silakan coba lagi besok atau upgrade plan Gemini API."
+          : "Tutor AI sedang tidak tersedia saat ini. Mohon coba lagi.";
+        return NextResponse.json({ reply: fallbackReply }, { status: 200 });
       }
     } else if (process.env.OPENAI_API_KEY) {
       reply = await askOpenAI(tutorPrompt);
