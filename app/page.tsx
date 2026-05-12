@@ -2,12 +2,18 @@
 
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { WalletReadyState } from "@solana/wallet-adapter-base";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 export default function Home() {
-  const { connected } = useWallet();
+  const { connected, wallets } = useWallet();
   const router = useRouter();
+  const readyWallet = wallets.find(
+    (wallet) =>
+      wallet.readyState === WalletReadyState.Installed ||
+      wallet.readyState === WalletReadyState.Loadable,
+  );
 
   useEffect(() => {
     if (connected) {
@@ -22,7 +28,18 @@ export default function Home() {
         Platform edukasi Web3. Hubungkan wallet Solana kamu untuk mulai belajar
         bersama AI Tutor dan dapatkan NFT.
       </p>
-      <WalletMultiButton />
+      {readyWallet ? (
+        <WalletMultiButton />
+      ) : (
+        <a
+          href="https://phantom.app/"
+          target="_blank"
+          rel="noreferrer"
+          className="rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-slate-700"
+        >
+          Install Phantom Wallet
+        </a>
+      )}
     </main>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 export default function Dashboard() {
@@ -10,6 +10,25 @@ export default function Dashboard() {
   const [prompt, setPrompt] = useState("");
   const [aiReply, setAiReply] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Simpan user ke database saat wallet terhubung
+  useEffect(() => {
+    const saveUser = async () => {
+      if (publicKey) {
+        try {
+          await fetch("/api/user", {
+            method: "POST",
+            body: JSON.stringify({ walletAddress: publicKey.toBase58() }),
+          });
+          console.log("User tersimpan di DB!");
+        } catch (error) {
+          console.error("Gagal simpan user:", error);
+        }
+      }
+    };
+
+    saveUser();
+  }, [publicKey]);
 
   const askAI = async () => {
     if (!prompt) return;
@@ -21,7 +40,7 @@ export default function Dashboard() {
       });
       const data = await res.json();
       setAiReply(data.reply);
-    } catch (error) {
+    } catch {
       setAiReply("Maaf, AI sedang sibuk.");
     }
     setLoading(false);
@@ -94,7 +113,7 @@ export default function Dashboard() {
           </div>
 
           {/* Kolom AI Tutor Kanan */}
-          <div className="border p-6 rounded-xl shadow-sm bg-slate-50 flex flex-col h-[500px]">
+          <div className="border p-6 rounded-xl shadow-sm bg-slate-50 flex flex-col h-125">
             <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
               ✨ AI Tutor
             </h2>
