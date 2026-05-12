@@ -7,7 +7,11 @@ type ChatPayload = {
   courseTitle?: string;
 };
 
-function buildTutorPrompt({ prompt, material, courseTitle }: Required<ChatPayload>) {
+function buildTutorPrompt({
+  prompt,
+  material,
+  courseTitle,
+}: Required<ChatPayload>) {
   return [
     "Kamu adalah Tutor AI di platform edukasi Web3 bernama SkillChain.",
     "Jawab dalam bahasa Indonesia yang ringkas, jelas, dan ramah untuk siswa.",
@@ -59,11 +63,13 @@ async function askGemini(systemPrompt: string) {
   }
 
   const genAI = new GoogleGenerativeAI(apiKey);
+
+  // PERBAIKAN: "gemini-1.5-flash" ditaruh paling atas karena kuota gratisnya paling besar (15 request/menit).
   const modelCandidates = [
     process.env.GEMINI_MODEL,
-    "gemini-1.5-pro-latest",
+    "gemini-1.5-flash",
     "gemini-1.5-flash-latest",
-    "gemini-2.0-flash",
+    "gemini-1.5-pro",
   ].filter((modelName): modelName is string => Boolean(modelName));
 
   let lastError: unknown;
@@ -80,7 +86,9 @@ async function askGemini(systemPrompt: string) {
     } catch (error) {
       lastError = error;
       const message = error instanceof Error ? error.message : String(error);
-      if (!/404|429/.test(message)) {
+
+      // Lompat ke model berikutnya jika error karena limit (429) atau server sibuk (503)
+      if (!/404|429|503/.test(message)) {
         throw error;
       }
     }
@@ -102,7 +110,7 @@ export async function POST(req: Request) {
 
     const tutorPrompt = buildTutorPrompt({
       prompt,
-      material: body.material?.trim() || "Materi belum dipilih.",
+      material: body.material?.trim() || "Materi belum tersedia.",
       courseTitle: body.courseTitle?.trim() || "SkillChain Course",
     });
 
@@ -116,12 +124,13 @@ export async function POST(req: Request) {
         if (process.env.OPENAI_API_KEY) {
           reply = await askOpenAI(tutorPrompt);
         } else {
+          // PERBAIKAN: Pesan error dibuat lebih halus untuk dibaca user di frontend
           return NextResponse.json(
             {
               reply:
-                "Tutor AI sedang sibuk atau quota Gemini belum tersedia. Coba lagi sebentar, atau isi OPENAI_API_KEY untuk fallback model lain.",
+                "Sistem AI sedang menerima terlalu banyak permintaan (Limit). Mohon tunggu sekitar 1 menit lalu coba lagi ya.",
             },
-            { status: 200 },
+            { status: 200 }, // Tetap 200 agar UI tidak merah, hanya menampilkan pesan ke user
           );
         }
       }
