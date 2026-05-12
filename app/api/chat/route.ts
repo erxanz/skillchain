@@ -106,6 +106,7 @@ async function askGemini(systemPrompt: string) {
 
   const modelCandidates = [
     process.env.GEMINI_MODEL,
+    "gemini-2.5-flash",
     "gemini-1.5-flash",
     "gemini-2.0-flash",
   ].filter((modelName): modelName is string => Boolean(modelName));
