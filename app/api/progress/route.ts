@@ -3,6 +3,18 @@ import { courseCatalog, getCourseById } from "@/lib/courses";
 import { mintCertificateNft } from "@/lib/nft";
 import { NextResponse } from "next/server";
 
+interface ProgressRecord {
+  courseId: string;
+  percentage?: number | null;
+  completedAt?: Date | null;
+}
+
+interface CertificateRecord {
+  courseId: string;
+  nftAddress?: string | null;
+  transactionSignature?: string | null;
+}
+
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
@@ -12,23 +24,19 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Wallet address dibutuhkan" }, { status: 400 });
     }
 
-    const progressRecords = await prisma.progress.findMany({
+    const progressRecords = (await prisma.progress.findMany({
       where: { userWalletAddress: walletAddress },
       include: { course: true },
       orderBy: { updatedAt: "desc" },
-    });
+    })) as ProgressRecord[];
 
-    const certificateRecords = await prisma.certificate.findMany({
+    const certificateRecords = (await prisma.certificate.findMany({
       where: { userWalletAddress: walletAddress },
-    });
+    })) as CertificateRecord[];
 
     const courseProgress = courseCatalog.map((course) => {
-      const progress = progressRecords.find(
-        (record: (typeof progressRecords)[number]) => record.courseId === course.id
-      );
-      const certificate = certificateRecords.find(
-        (record: (typeof certificateRecords)[number]) => record.courseId === course.id
-      );
+      const progress = progressRecords.find((record: ProgressRecord) => record.courseId === course.id);
+      const certificate = certificateRecords.find((record: CertificateRecord) => record.courseId === course.id);
 
       return {
         ...course,
