@@ -10,6 +10,8 @@ export default function Dashboard() {
   const [prompt, setPrompt] = useState("");
   const [aiReply, setAiReply] = useState("");
   const [loading, setLoading] = useState(false);
+  const [claiming, setClaiming] = useState(false);
+  const [nftClaimed, setNftClaimed] = useState(false);
 
   // Simpan user ke database saat wallet terhubung
   useEffect(() => {
@@ -44,6 +46,30 @@ export default function Dashboard() {
       setAiReply("Maaf, AI sedang sibuk.");
     }
     setLoading(false);
+  };
+
+  const handleClaimNFT = async () => {
+    if (!publicKey) return;
+    
+    setClaiming(true);
+    try {
+      const res = await fetch("/api/mint", {
+        method: "POST",
+        body: JSON.stringify({ 
+          walletAddress: publicKey.toBase58(),
+          courseId: "course-solana-101" // dummy ID course
+        }),
+      });
+      
+      const data = await res.json();
+      if (data.success) {
+        setNftClaimed(true);
+        alert(`Selamat! NFT berhasil dikirim ke wallet: ${publicKey.toBase58()}`);
+      }
+    } catch (error) {
+      alert("Gagal klaim NFT");
+    }
+    setClaiming(false);
   };
 
   const handleLogout = () => {
@@ -106,9 +132,19 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-3 rounded-lg transition-colors">
-                Claim NFT Certificate
-              </button>
+              {nftClaimed ? (
+                <button disabled className="w-full bg-slate-300 text-slate-600 font-medium px-4 py-3 rounded-lg flex items-center justify-center gap-2">
+                  ✓ NFT Certificate Claimed
+                </button>
+              ) : (
+                <button 
+                  onClick={handleClaimNFT}
+                  disabled={claiming}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-3 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {claiming ? "Minting to Blockchain..." : "Claim NFT Certificate"}
+                </button>
+              )}
             </div>
           </div>
 
