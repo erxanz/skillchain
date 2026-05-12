@@ -21,7 +21,10 @@ export async function GET(req: Request) {
     const walletAddress = url.searchParams.get("walletAddress");
 
     if (!walletAddress) {
-      return NextResponse.json({ error: "Wallet address dibutuhkan" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Wallet address dibutuhkan" },
+        { status: 400 },
+      );
     }
 
     const progressRecords = (await prisma.progress.findMany({
@@ -35,8 +38,13 @@ export async function GET(req: Request) {
     })) as CertificateRecord[];
 
     const courseProgress = courseCatalog.map((course) => {
-      const progress = progressRecords.find((record: ProgressRecord) => record.courseId === course.id);
-      const certificate = certificateRecords.find((record: CertificateRecord) => record.courseId === course.id);
+      // Perbaikan: Menambahkan tipe : ProgressRecord dan : CertificateRecord secara eksplisit
+      const progress = progressRecords.find(
+        (record: ProgressRecord) => record.courseId === course.id,
+      );
+      const certificate = certificateRecords.find(
+        (record: CertificateRecord) => record.courseId === course.id,
+      );
 
       return {
         ...course,
@@ -53,7 +61,10 @@ export async function GET(req: Request) {
     });
   } catch (error) {
     console.error("Progress fetch error:", error);
-    return NextResponse.json({ error: "Gagal mengambil progress" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Gagal mengambil progress" },
+      { status: 500 },
+    );
   }
 }
 
@@ -71,10 +82,16 @@ export async function POST(req: Request) {
     const course = getCourseById(courseId);
 
     if (!course) {
-      return NextResponse.json({ error: "Course tidak ditemukan" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Course tidak ditemukan" },
+        { status: 404 },
+      );
     }
 
-    const normalizedProgress = Math.max(0, Math.min(100, Number(progress ?? 0)));
+    const normalizedProgress = Math.max(
+      0,
+      Math.min(100, Number(progress ?? 0)),
+    );
     const completedAt = normalizedProgress >= 100 ? new Date() : null;
     const origin = new URL(req.url).origin;
 
@@ -158,6 +175,9 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error("Progress update error:", error);
-    return NextResponse.json({ error: "Gagal menyimpan progress" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Gagal menyimpan progress" },
+      { status: 500 },
+    );
   }
 }
