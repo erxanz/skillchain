@@ -65,10 +65,10 @@ async function askGemini(systemPrompt: string) {
   const genAI = new GoogleGenerativeAI(apiKey);
 
   // PERBAIKAN: "gemini-1.5-flash" ditaruh paling atas karena kuota gratisnya paling besar (15 request/menit).
+  // Akhiran '-latest' dihapus agar lebih stabil dan terhindar dari bug versi API.
   const modelCandidates = [
     process.env.GEMINI_MODEL,
     "gemini-1.5-flash",
-    "gemini-1.5-flash-latest",
     "gemini-1.5-pro",
   ].filter((modelName): modelName is string => Boolean(modelName));
 
@@ -76,18 +76,17 @@ async function askGemini(systemPrompt: string) {
 
   for (const modelName of modelCandidates) {
     try {
-      const model = genAI.getGenerativeModel(
-        { model: modelName },
-        { apiVersion: modelName.startsWith("gemini-1.5") ? "v1beta" : "v1" },
-      );
-      const result = await model.generateContent(systemPrompt);
+      // PERBAIKAN UTAMA: Hapus pengaturan { apiVersion: ... } agar SDK mendeteksi otomatis
+      // Ini mencegah error 404 Not Found.
+      const model = genAI.getGenerativeModel({ model: modelName });
 
+      const result = await model.generateContent(systemPrompt);
       return result.response.text().trim();
     } catch (error) {
       lastError = error;
       const message = error instanceof Error ? error.message : String(error);
 
-      // Lompat ke model berikutnya jika error karena limit (429) atau server sibuk (503)
+      // Lompat ke model berikutnya jika error karena limit (429), tidak ditemukan (404), atau server sibuk (503)
       if (!/404|429|503/.test(message)) {
         throw error;
       }
