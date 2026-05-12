@@ -329,8 +329,31 @@ export default function DashboardPage() {
 
                 {selectedCourse.nftAddress ? (
                   <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
-                    <p className="font-semibold">NFT certificate sudah tersedia</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-semibold">NFT certificate sudah tersedia</p>
+                      <span className="rounded-full border border-emerald-300 bg-white px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-[0.2em] text-emerald-700">
+                        {selectedCourse.transactionSignature?.startsWith("demo-") ? "Mode demo" : "On-chain"}
+                      </span>
+                    </div>
                     <p className="mt-1 break-all">{selectedCourse.nftAddress}</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button asChild size="sm" className="rounded-full bg-emerald-600 text-white hover:bg-emerald-500">
+                        <Link href="/certificate.svg" target="_blank" rel="noreferrer">
+                          Lihat sertifikat
+                        </Link>
+                      </Button>
+                      {selectedCourse.transactionSignature && !selectedCourse.transactionSignature.startsWith("demo-") ? (
+                        <Button asChild size="sm" variant="outline" className="rounded-full border-emerald-300 text-emerald-800 hover:bg-emerald-100">
+                          <Link
+                            href={`https://explorer.solana.com/tx/${selectedCourse.transactionSignature}?cluster=devnet`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Buka Explorer
+                          </Link>
+                        </Button>
+                      ) : null}
+                    </div>
                   </div>
                 ) : null}
 
